@@ -1,0 +1,16 @@
+import "Microsoft.ObjectStore.QueueService.bond"
+
+namespace H_;
+
+
+// key types for multi-tennant service
+
+[A("\0\0\0\0\0\0\0\0")]
+struct H:Microsoft.ObjectStore.QueueService.QueueKeyTableBase
+{
+    100: required vector<uint8> messageKey;
+    [KeyMetadata("PartitionKey")]
+    200: required Microsoft.ObjectStore.QueueService.QueueID queueID;   // name of queue, must be unique. Must match preconfigured queue if CreateQueue is disabled
+                                                                        // PartitionKey attribute must be match (on partitionSelector or queueID) in QueueKey and QueueKeyTable
+}
+

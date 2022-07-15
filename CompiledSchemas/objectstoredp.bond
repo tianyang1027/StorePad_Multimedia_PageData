@@ -1,0 +1,77 @@
+// Types used for Delete Processor coprocs as part of GDPR
+
+namespace ObjectStoreDP
+
+struct RandomKey
+{
+	10: required uint32	randomKey;	// random value to spread the load on all replicas
+};
+
+
+struct TimeRangePredicate
+{
+	10: optional int64 startTime = 0;
+	20: optional int64 endTime = 0;
+};
+
+struct PrivacySubject
+{
+	// empty
+};
+
+struct PrivacyCommand
+{
+	10: optional string AssetGroupId = null;
+	20: optional string AssetGroupQualifier = null;
+	30: optional string CommandId = null;
+	40: optional bonded<PrivacySubject> Subject;		// assumed to always be MSA type for now
+};
+
+
+struct DeleteCommand : PrivacyCommand
+{
+	10: optional string PrivacyDataType = null;
+	20: optional TimeRangePredicate TimeRangePredicate;
+};
+
+struct AccountCloseCommand : PrivacyCommand
+{
+
+};
+
+struct MsaSubject : PrivacySubject
+{
+	10: optional string Anid = null;
+	20: optional int64 Cid = 0;
+	30: optional string Opid = null;
+	40: optional int64 Puid = 0;
+	50: optional string Xuid = null;
+	60: optional string AsimovPuid = null;
+	70: optional string HexPuid = null;
+	80: optional string AsimovCid = null;
+	90: optional string HexCid = null;
+};
+
+
+enum CommandResult
+{
+	CommandComplete = 1,	// Succeeded
+	CommandFailed = 2,		// Failed
+    CommandDeidentify = 3	// Indicates that the agent has chosen to anonomize the data instead of deleting. This status requires explicit approval from CELA.
+};
+
+
+struct DeleteResponse
+{
+	10: optional string CommandId = null;						// set to the same id that was sent in for the command
+	20: optional uint32 rowsDeleted = 0;						// number of records that were deleted for this command
+	30: optional CommandResult CommandResult = CommandFailed;	// Success/Failure of the command
+};
+
+	
+struct AccountCloseResponse
+{
+	10: optional string CommandId = null;						// set to the same id that was sent in for the command
+	20: optional uint32 rowsDeleted = 0;						// number of records that were deleted for this command
+	30: optional CommandResult CommandResult = CommandFailed;	// Success/Failure of the command
+};

@@ -1,0 +1,18 @@
+namespace DeepLearning
+
+
+struct ModelServerRequestCacheKey
+{
+    // model full name, that includes model name and version
+    10: required string  m_modelFullName;
+    // Different cache implementation will use different blob as key
+    30: required blob    m_requestKeyBlob; 
+    100: required int32  m_cacheType;
+};
+
+struct ModelServerRequestCacheValue
+{
+    // Different cache implementation will use different blob containing cached response
+    10: required blob    m_blob;
+};
+

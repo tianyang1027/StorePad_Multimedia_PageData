@@ -1,0 +1,36 @@
+namespace ObjectStore;
+
+struct KdTreeSearchRequestFloat
+{
+    1: required vector<float> vect;    
+    2: required uint32 numResults;
+}
+
+struct KdTreeSearchRequestByte
+{
+    1: required vector<uint8> vect;    
+    2: required uint32 numResults;
+}
+
+struct KdTreeSearchResult
+{
+    1: required string metadata;
+    2: required float score;
+}
+
+struct KdTreeSearchResponse
+{
+    1: required vector<KdTreeSearchResult> results;
+}
+
+struct KdTreePartitionId
+{
+    1: required uint32 id;
+}
+
+
+struct KdTreeSearchCacheResponse
+{
+    1: required vector<KdTreeSearchResult> results;
+    2: required bool hitCache = false;
+}

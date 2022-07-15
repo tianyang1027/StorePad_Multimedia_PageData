@@ -1,0 +1,26 @@
+namespace ObjectStore
+
+struct PartitionId
+{
+    1: required int32 m_id;
+}
+
+struct SharedFileStoreRequest
+{
+    [KeyMetadata("PartitionKey")]
+    1:  required PartitionId                                                m_partitionId;
+    10: required uint32                                                     m_Version;
+};
+
+struct SharedFile
+{
+    10: required string                                                     m_Key;
+    20: required string                                                     m_ShareName;
+};
+
+struct SharedFileStoreResponse
+{
+    10: required uint32                                                     m_Version;
+    20: required vector<SharedFile>                                         m_SharedFiles;
+    30: string                                                              m_StoreVersionId = "-1";
+};

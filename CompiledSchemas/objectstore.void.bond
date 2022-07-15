@@ -1,0 +1,8 @@
+namespace ObjectStore
+
+//
+// Represents void type, used for XAP partners where file name needs to be the same as type full name.
+//
+struct Void
+{
+};

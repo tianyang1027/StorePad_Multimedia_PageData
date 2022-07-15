@@ -1,0 +1,64 @@
+// Keep in sync with SearchGold\deploy\builds\data\ObjectStore\Partners\System\ANNSearch\ANNSearchTypes.bond
+// Not used in actual ANN table manifest, only used to pass the creation of ANN table in Portal
+
+namespace ANNFileStore
+
+// ANN aggregator extension request param
+// ANN native extension rquest param
+struct ANNSearchRequest<T>
+{
+    10: required vector<T> vect;
+    
+    20: required uint32 numResults;
+    
+    30: required map<string,string> extraParams; // for future use
+}
+
+struct ANNMetadataKey
+{
+    10: required int64 metadataIndex = -1;
+}
+
+struct ANNMetadataVal
+{
+    10: required blob metadata;
+}
+
+// Metadata could be loaded in-memory as part of ANN store or could be collocated in separate metadata store
+// metadataKey.metadataIndex will be set to -1 if metadata is part of ANN store
+struct ANNSearchIndexResult
+{
+    10: required float score;
+
+    20: optional ANNMetadataKey metadataKey;
+
+    30: optional ANNMetadataVal metadataVal;
+}
+
+// ANN File store value type
+// Key : ANNPartitionId
+struct ANNSearchIndexResults
+{
+    10: required vector<ANNSearchIndexResult> results;
+}
+
+struct ANNSearchValue
+{
+    10: required float score;
+    20: required blob metadataBlob;
+}
+
+// key for SearchAggregator extension (dummy key)
+struct ANNPartitionId
+{
+  10: required uint32 id;
+}
+
+// ANN extension value type
+struct ANNSearchResult
+{
+    10: required vector<ANNSearchValue> results;
+    20: optional uint32 totalPartitionCount;
+    30: optional uint32 failedPartitionCount;
+}
+

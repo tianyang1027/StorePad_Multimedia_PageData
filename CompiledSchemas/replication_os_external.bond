@@ -1,0 +1,38 @@
+import "bond.bond"
+
+
+namespace A1.Replication
+
+// These are the key and value schemas of the objectstore recovery tables
+struct OSVertexKey
+{
+    0: required string          type;
+    1: required blob            key;
+}
+
+struct OSVertexValue
+{
+    0: bool                         deleted = false;
+    [Index.BondedVoidPayloadTypeName("user_data")]
+    1: string                       type; // same as OSVertexKey.type, required by OSearch
+    [Index.Default("")]
+    2: nullable<bonded<Microsoft.Bond.Void>>  user_data;
+}
+
+struct OSEdgeKey
+{
+    0: required string          type;
+    1: required OSVertexKey     src_key;
+    2: required OSVertexKey     dest_key;
+}
+
+struct OSEdgeValue
+{
+    0: bool                         deleted = false;
+    [Index.BondedVoidPayloadTypeName("user_data")]
+    1: string                       type;
+    [Index.Default("")]
+    2: nullable<bonded<Microsoft.Bond.Void>>    user_data;
+    3: nullable<bonded<Microsoft.Bond.Void>>    src_vertex_key; // make these nullable, they will be null when deleted == true
+    4: nullable<bonded<Microsoft.Bond.Void>>    dest_vertex_key;
+}

@@ -1,0 +1,57 @@
+// Schema Metadata
+import "bond.bond"
+
+namespace Microsoft.ObjectStore.Schema
+
+// ==================================
+// Define Schema metadata
+// ==================================
+
+struct TableIdentifier
+{
+    1: required string NamespaceName;
+    2: required string TableName;
+}
+
+struct TableSchemaDef
+{
+    1: required Microsoft.Bond.SchemaDef KeySchema;
+    2: required Microsoft.Bond.SchemaDef ValueSchema;
+    3: optional vector<Microsoft.Bond.SchemaDef> PublishedSchemas;
+}
+
+struct TableSchemaEntry
+{
+    1: required TableIdentifier TableIdentifier;
+    2: optional nullable<TableSchemaDef> TableSchemaDef;
+}
+
+struct TableSchemaEntries
+{
+    1: required vector<TableSchemaEntry> Entries;
+}
+
+struct CoprocSchemaDef
+{
+    1: required Microsoft.Bond.SchemaDef KeySchema;
+    2: required Microsoft.Bond.SchemaDef ResponseSchema;
+    3: optional nullable<Microsoft.Bond.SchemaDef> KeyParamSchema;
+    4: optional nullable<Microsoft.Bond.SchemaDef> RequestParamSchema;
+}
+
+struct ServiceSchemaDef
+{
+    // CoprocName (without Service) -> Coproc schema def
+    1: required map<string, CoprocSchemaDef> CoprocSchemaDefs;
+}
+
+struct TableServiceSchemaEntry
+{
+    1: required TableIdentifier TableIdentifier;
+    2: optional map<string, ServiceSchemaDef> ServiceSchemaDefs;
+}
+
+struct TableServiceSchemaEntries
+{
+    1: required vector<TableServiceSchemaEntry> Entries;
+}

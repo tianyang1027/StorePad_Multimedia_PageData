@@ -1,0 +1,27 @@
+namespace Multimedia
+ 
+struct PageDataKey
+{
+    1: required string PageKey;
+}
+ 
+struct StringFeatureValue
+{
+    1: required uint32 Timestamp;
+    2: required string Value;
+}
+ 
+struct PageDataValue
+{
+	// We have 2 K:V pairs for M1
+    // "Title" : SomeTitle
+    // "Domain" : SomeDomain
+    // For flight, we add new K:V pair such as "Title$FlightID" : SomeNewTitle to the map. 
+	// If "Title$FlightID" is not found in the map, we fall back to default value SomeTitle.
+	// There should be no "$" in feature name or flight ID.
+    [ColumnStore.ColumnFamily("Basic")]
+    1: optional map<string, StringFeatureValue>  BasicFeatures;
+ 
+    // TODO, we will add other ColumnFamily such as "Product" in the future
+    
+}

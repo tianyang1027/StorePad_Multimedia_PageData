@@ -1,0 +1,107 @@
+//
+// Coproc related types
+//
+
+namespace IndexService;
+
+enum ResponseCode
+{
+    Failure = 0,
+    SuccessKeyPresent,
+    SuccessKeyNotPresent,
+    UnknownResponseCode,
+}
+
+struct MarkerIndexValue
+{
+    1: optional uint16 m_markerIndex;
+    2: optional uint32 m_markerValue;
+};
+
+struct UrlHash16B
+{
+    1: optional uint64 m_data1;
+    2: optional uint64 m_data2;
+};
+
+struct RankerExtendedResults
+{
+    1: optional uint64 m_doc_ID;
+    2: optional string m_doc_ExtendedDebugString;
+    3: optional string m_EQDebugBin;
+    4: optional uint32 m_minidoc_ID;
+    5: optional nullable<UrlHash16B> m_urlHash16B;
+};
+
+struct DocResponseInfo
+{
+    // 10: optional CDCaptionSet m_CDCaptionSet;
+    20: optional uint8 m_Doc_IsShingleClusterRoot;
+    21: optional uint32 m_Doc_HostClusterSize;
+    22: optional uint64 m_Doc_ParentDocID;
+
+    30: optional uint32 m_Doc_Definitive;
+    31: optional float m_Doc_AdjustedRank;
+    32: optional float m_Doc_SuperfreshRank;
+    33: optional float m_Doc_TLANNRank;
+    34: optional uint32 m_KeepInPlaceEnum;
+    35: optional uint16 m_FinalRankRound;
+
+    50: optional vector<double> m_TLARerankScores;
+    51: optional uint32 m_FcsDedupStatus;
+    52: optional uint32 m_Doc_NewsClusterID;
+
+    60: optional float m_Doc_FinalRank;
+    61: optional double m_Doc_FinalDoubleRank;   
+
+    70: optional uint32 m_MediaClusterId;
+    72: optional uint8 m_Doc_MediaRealtime;
+    73: optional string m_MediaAggregatedText;
+
+    90: optional vector<uint16> m_Doc_ShinglePrint;
+    91: optional nullable<uint32> m_Doc_Crc32;
+    92: optional nullable<uint8> m_Doc_WordBreakerVersion;
+    93: optional uint32 m_Doc_HostID;
+    94: optional uint32 m_Doc_Title_Hash;
+    95: optional map<uint8, uint32> m_Doc_FirstMarker;
+    96: optional map<uint8, uint32> m_Doc_FirstMarkerSecondary;
+    97: optional map<uint8, float> m_Doc_FirstExtraRanker;
+    98: optional vector<MarkerIndexValue> m_doc_ThirdMarkerFlatArray;
+    99: optional uint8 m_doc_tlaModelFailsOnIFM;
+
+    131: optional RankerExtendedResults m_RankerExtendedResults;
+
+    201: optional float m_QueryLatitudeID;
+    202: optional float m_QueryLongitudeID;
+
+    // 300: optional vector<PassageResult> m_passageResults;
+}
+
+struct DebugInfo
+{
+    10: optional nullable<DocResponseInfo> DocResponseInfo = nothing;
+}
+
+struct Response<TKey, TValue>
+{
+	10: required ResponseCode Code = UnknownResponseCode;
+	20: required TKey		  Key;
+	30: required TValue       Value;
+    40: optional nullable<DebugInfo>    DebugInfo = nothing;
+}
+
+struct Request
+{
+    10: optional string TLAQuery;
+    11: optional uint32 TLATimeoutMS;
+    12: optional map<string, string> TLAUserSubQueries;
+    20: optional uint32 ResultCount;
+    21: optional uint32 ResultBase;
+    30: optional string TraceId;
+    40: optional bool   IsDebug = false;
+}
+
+struct ResponseBlob
+{
+    10: required blob tlaResponse;
+}

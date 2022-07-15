@@ -1,0 +1,288 @@
+namespace Microsoft.ObjectStore.QueueService;
+
+// base for messages
+struct VoidMessage
+{
+}
+
+struct QueueID
+{
+    1: required string queueStringID;
+}
+
+struct QueueKeyBase
+{
+// 20 bytes: HACK
+0: required uint64 f0;
+1: required uint64 f1;
+2: required uint32 f2;
+}
+
+struct QueueKeyTableBase
+{
+// 20 bytes: HACK
+0: required uint64 f0;
+1: required uint64 f1;
+2: required uint32 f2;
+}
+
+struct VersionState:VoidMessage
+{
+    1: required uint64 versionCounter;
+    2: nullable<bonded<VoidMessage>> extraData;
+}
+
+struct VersionSlot
+{
+    1: required bonded<VoidMessage> key;
+    2: required VersionState state;
+}
+
+struct VersionConditions
+{
+    1: required vector<VersionSlot> slots;
+    2: nullable<bonded<VoidMessage>> extraData;
+}
+
+// record in messagetable
+struct MessageEnvelope
+{
+    1: required bonded<VoidMessage> message;
+    2: nullable<VersionConditions> versionConditions;
+    3: required uint32 timeoutCounter;
+    4: optional vector<string> multiplex;                               // a list of multiplex. Multiplex starting with * are rule lookup requests (see comment below)
+                                                                        // on dequeue will contain a single multiplex name only (or nothing if no multiplex was specified in enqueue)
+    5: optional bool deleteVersionSlotAuto = true;                      // If true, the VersionCondition slots will be deleted auto autodelete timeout
+    6: optional string loggableTraceID = nothing;                       // A loggable traceid. See deployment specific schema for details (e.e. DLDWCoprocs.Types.bond)
+    7: optional int64 enqueueTimeTicks = 0;                             // Timestamp in ticks when this event was enqueued. Populated by queue service automatically - ignored as input to EnqueueMessages
+}
+
+// Format of a multiplex string on enqueue:
+// No '*' prefix: taken literally, no lookup in multiplex rules
+// '*' prefix: 
+//     multiplex:='*'<RuleName>{[exclusionFilter]|[includeCandidate]}*
+//     exclusionFilter:='|-'<stringliteral>
+//     includeCandidate:='|+'<stringliteral>
+//     1. retrieve candidate multiplex list from multiplex rules
+//     2. remove any candidates matching any exclusionFilters (e.g. 'Experiment_*' or '*')
+//     3. Add all includeList if they were present in candidates
+//     all string comparisons done with string after .ToLowerInvariant() 
+
+// DLDW specific example:
+// "*email:0|-Experiment_*"                                     : All candidate multiplex not starting with "Experiment_" (all production plugins)
+// "*email:0|-*|+Experiment_Plugin"                             : No production plugins, plus only "Experiment_Plugin" if was in candidates
+// "*email:0|-Experiment_*|-ToDoExtractor|+Experiment_Plugin"   : All production plugins except "ToDoExtractor", plus only "Experiment_Plugin" if was in candidates
+
+// request to create a queue
+struct CreateQueueRequestBase<A>
+{
+    1: optional string logName;                                         // queue name used for logging only
+    2: required A applicationId;                                        // app id of queue creator. Can perform all queue operations
+    3: required vector<A> allowedEnqueueApplicationIds;                 // these apps may enqueue only
+    4: required vector<A> allowedDequeueApplicationIds;                 // these apps may dequeue and delete only
+    5: optional int32 cloakTimeoutSeconds;                              // timeout for how long a message stays cloaked after dequeueing
+    6: optional int32 autoDeleteTimeoutCount;                           // if > 0: after these many timeouts, the message gets automatically deleted
+}
+
+// Internal record to keep track of head and tail counters
+struct QueueCounter:VoidMessage
+{
+    1: required int64 counter;
+}
+
+// Internal record to keep track of Multiplex rules for queue
+struct MultiplexRules:VoidMessage
+{
+    1: required map<string,vector<string>> rules;
+    2: optional uint64 versionCounter;
+    3: optional map<string,vector<bonded<VoidMessage>>> metadata;
+}
+
+// For simple typed messages, such as string
+struct SimpleTypeHolder<T>:VoidMessage
+{
+    1: required T value;
+}
+
+// enumeration for queue creation result status
+enum CreateQueueResponseStatus
+{
+    CreateQueueResponseStatus_Success = 0,                              // queue created successfully
+    CreateQueueResponseStatus_QueueExists,                              // queue was not created because it already exists
+    CreateQueueResponseStatus_NotAllowed,                               // queue was not created because CreateQueue call is disabled
+    CreateQueueResponseStatus_FailedQueueIDNotProvided,                 // queue was not created because queueStringID was not provided
+    CreateQueueResponseStatus_Failed                                    // queue was not created due to some error
+}
+
+// response from CreateQueue
+struct CreateQueueResponse
+{
+    1: required CreateQueueResponseStatus status = CreateQueueResponseStatus_Success;
+}
+
+// client passes one of these for each message to be deleted
+struct DeleteMessage
+{
+    1: required int64 messageId;                                        // as returned by DequeueMessage
+    2: required int64 messageDeleteToken;                               // as returned by DequeueMessage. Must match the internal delete token for this message
+}
+
+// request for message deletion
+struct DeleteMessageRequest
+{
+    1: required vector<DeleteMessage> messages;                         // multiple DeleteMessage arguments
+    2: optional uint64 versionCounter;
+}
+
+// enumeration for DeleteMessage result status
+enum DeleteMessageResponseStatus
+{
+    DeleteMessageResponseStatus_Success = 0,                                   // DeleteMessage succeeded
+    DeleteMessageResponseStatus_MessageNotFound,                               // an unknown messageId was passed in. Maybe message got already deleted, or messageId is greater than the head
+    DeleteMessageResponseStatus_TimeoutExpired,                                // the message is known, but by the time the client called this, the cloaking timeout had already expired
+    DeleteMessageResponseStatus_NotAuthorized,                                 // the caller is not authorized to perform the delete operation
+    DeleteMessageResponseStatus_QueueNotFound                                  // The requested queue/partition combination does not exist
+}
+
+// response from DeleteMessage
+struct DeleteMessageResponse
+{
+    1: required vector<DeleteMessageResponseStatus> status;                    // status for each DeleteMessageRequest passed by the caller
+}
+
+// The request type for DequeueMessages
+struct DequeueRequest
+{
+    1: required uint32 messageCount;                                    // retrieve at most these many messages. Maybe 0 if only interested in queue stats
+    2: required bool peekOnly;                                          // set this to true if only want to peek at messages without cloaking. Will not receive a valid delete token.
+    3: optional string useAllPartitionsOnHost = nothing;                // If this is set to a machine name, all queue partitions on that machines will be used round-robin
+}
+
+// enumeration for DequeueMessage result status
+enum DequeueResponseStatus
+{
+    DequeueResponseStatus_Success = 0,                                  // DequeueMessage succeeded
+    DequeueResponseStatus_NoMessagesAvailable,                          // DequeueMessage succeeded, but the caller requested at least one message, and there is none available
+    DequeueResponseStatus_NotAuthorized,                                // the caller is not authorized to perform the dequeue operation
+    DequeueResponseStatus_QueueNotFound                                 // The requested queue/partition combination does not exist
+}
+
+// all the details of a dequeued message
+struct DequeuedMessage
+{
+    1: required int64 messageId;                                        // the message id
+    2: required int64 messageDeleteToken;                               // the delete token
+    3: required MessageEnvelope messageEnvelope;                        // the actual message payload
+
+    // TODO: Consider atomically reading VersionCondition dependencies. This would checking if a newer message has been enqueued in the meantime
+}
+
+// response from DequeueMessage
+struct DequeueResponse
+{
+    1: required DequeueResponseStatus status = DequeueResponseStatus_Success;
+    2: required int64 approximateAvailableMessages;                     // roughly these many messages are available for dequeue
+    3: required int64 approximateCloakedMessages;                       // roughly these many messages are current cloaked (being processed by clients)
+    4: required vector<DequeuedMessage> messages;                       // the actual retrieved messages
+}
+
+// The request structure for EnqueueMesssages
+struct EnqueueRequest
+{
+    1: required vector<MessageEnvelope> messageEnvelopes;
+    2: optional bool retainVersions = true;                             // By default, version details are retained with messages and returned on dequeue
+}
+
+// enumeration for EnqueueMessage result status
+enum EnqueueResponseStatus
+{
+    EnqueueResponseStatus_Success = 0,                                  // EnqueueMessages succeeded
+    EnqueueResponseStatus_FailedVersionCheck,                           // EnqueueMessages due to a uniqueness conflict, compare details.versionState with passed in versionState for reason
+    EnqueueResponseStatus_Failed,                                       // EnqueueMessages failed
+    EnqueueResponseStatus_NotAuthorized,                                // the caller is not authorized to perform the enqueue operation
+    EnqueueResponseStatus_QueueNotFound,                                // The requested queue/partition combination does not exist
+    EnqueueResponseStatus_UnknownMultiplexRule,                         // The requested multiplex rule does not exist
+    EnqueueResponseStatus_VersionKeyMissing                             // A VersionCondition entry had a missing key
+}
+
+struct EnqueueResponseDetails
+{
+    1: required EnqueueResponseStatus status = EnqueueResponseStatus_Success;
+    2: nullable<vector<VersionState>> versionStates;
+    3: optional vector<string> loggableTraceIDs;                        // A list of loggable traceids (could be more than one due to multiplexing). See deployment specific schema for details (e.e. DLDWCoprocs.Types.bond)
+    4: optional int64 enqueueTimeTicks = 0;                             // Timestamp in ticks when this event was enqueued. Populated by queue service automatically.
+}
+
+// response from EnqueueMessage
+struct EnqueueResponse
+{
+    1: required vector<EnqueueResponseDetails> details;
+}
+
+struct SetMultiplexRuleRequest
+{
+    1: required string ruleName;
+    2: required vector<string> multiplex;
+    3: optional uint64 versionCounter;
+    4: optional string useAllPartitionsOnHost = nothing;                         // If this is set to a machine name, subscribe to all queue partitions on that machine. This will create a covering set if called once from all machines
+    5: optional vector<bonded<VoidMessage>> metadata;                            // parallel vector to multiplex, optionally metadata for each multiplex (plugin)
+}
+
+enum SetMultiplexRuleResponseStatus
+{
+    SetMultiplexRuleResponseStatus_Success = 0,
+    SetMultiplexRuleResponseStatus_Failed,
+    SetMultiplexRuleResponseStatus_NotAuthorized,                                // the caller is not authorized to perform the enqueue operation
+    SetMultiplexRuleResponseStatus_QueueNotFound,                                // The requested queue/partition combination does not exist
+    SetMultiplexRuleResponseStatus_VersionConflict                               // a passed in version number was older than previously, the setrule request was ignored
+}
+
+struct SetMultiplexRuleResponse
+{
+    1: required SetMultiplexRuleResponseStatus status = SetMultiplexRuleResponseStatus_Success;
+}
+
+enum GetMultiplexRulesResponseStatus
+{
+    GetMultiplexRulesResponseStatus_Success = 0,
+    GetMultiplexRulesResponseStatus_Failed,
+    GetMultiplexRulesResponseStatus_NotAuthorized,                                // the caller is not authorized to perform the enqueue operation
+    GetMultiplexRulesResponseStatus_QueueNotFound                                 // The requested queue/partition combination does not exist
+}
+
+struct GetMultiplexRulesResponse
+{
+    1: required GetMultiplexRulesResponseStatus status = GetMultiplexRulesResponseStatus_Success;
+    2: required MultiplexRules multiplexRules;
+}
+
+// The following types are used for test requests only
+
+struct PartitionKeyTestResponse
+{
+    1: required string primaryMachineName;
+}
+
+// The request structure for DRIVersionConditionsRequest
+struct DRIVersionConditionsRequest
+{
+    1: VersionConditions versionConditions;
+    2: bool clear = false;
+}
+
+// enumeration for DRIVersionConditions result status
+enum DRIVersionConditionsResponseStatus
+{
+    DRIVersionConditionsResponseStatus_Success = 0,                     // DRIVersionConditions succeeded
+    DRIVersionConditionsResponseStatus_Failed,                          // DRIVersionConditions failed
+    DRIVersionConditionsResponseStatus_NotAuthorized,                   // the caller is not authorized to perform the enqueue operation
+    DRIVersionConditionsResponseStatus_QueueNotFound,                   // The requested queue/partition combination does not exist
+    DRIVersionConditionsResponseStatus_VersionKeyMissing,               // VersionConditionSlot had a missing key value
+}
+
+// The response structure for DRIVersionConditionsRequest
+struct DRIVersionConditionsResponse
+{
+    1: VersionConditions versionConditions;
+    2: required DRIVersionConditionsResponseStatus status = DRIVersionConditionsResponseStatus_Success;
+}

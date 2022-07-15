@@ -1,0 +1,8 @@
+namespace ObjectStore;
+
+// The schema is used for Legacy partners data (blobs).
+// Key and Value blobs are getting wrapped into bond objects using this schema.
+struct BlobEnvelope
+{
+    10: required blob Bytes;
+}
